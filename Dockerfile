@@ -1,30 +1,71 @@
 # syntax=docker/dockerfile:1
 FROM alpine:latest
 
-# Installer Tor, Privoxy, curl et utilitaires
-RUN apk add --no-cache curl tor privoxy bash nyx lyrebird \
+# Packages nécessaires
+RUN apk add --no-cache \
+    tor \
+    privoxy \
+    curl \
+    bash \
+    nyx \
+    lyrebird \
+    openssh-client \
+    autossh \
     && rm -rf /var/cache/apk/* \
-    && mkdir -p /etc/tor /var/lib/tor \
-    && chown -R tor:tor /etc/tor /var/lib/tor
+    && mkdir -p /etc/tor /var/lib/tor /root/.ssh \
+    && chmod 700 /root/.ssh
 
-# Créer un torrc minimal
+# torrc de base (proxy local)
 RUN echo "SocksPort 0.0.0.0:9050" > /etc/tor/torrc \
-    && echo "SocksPolicy accept 0.0.0.0/0" >> /etc/tor/torrc
+ && echo "SocksPolicy accept 0.0.0.0/0" >> /etc/tor/torrc \
+ && echo "Log notice stdout" >> /etc/tor/torrc
 
-# Créer la config Privoxy pour forwarder vers Tor
+# Privoxy → Tor
 RUN echo "listen-address 0.0.0.0:8118" > /etc/privoxy/config \
-    && echo "forward-socks5 / 127.0.0.1:9050 ." >> /etc/privoxy/config
+ && echo "forward-socks5 / 127.0.0.1:9050 ." >> /etc/privoxy/config
 
-# Exposer les ports
-EXPOSE 9050 9051 8118
+# Script de démarrage
+RUN cat << 'EOF' > /entrypoint.sh
+#!/bin/sh
+set -e
 
-# Healthcheck sur SOCKS5
-HEALTHCHECK --interval=300s --timeout=15s --start-period=60s \
-    CMD curl -x socks5h://127.0.0.1:9050 'https://check.torproject.org/api/ip' \
-        | grep -qm1 -E '"IsTor"\s*:\s*true'
+echo "[INFO] SSH_TUNNEL=$SSH_TUNNEL"
 
-# Volumes pour config et données
-VOLUME ["/etc/tor", "/var/lib/tor"]
+if [ "$SSH_TUNNEL" = "true" ]; then
+  echo "[INFO] Starting SSH tunnel…"
 
-# Lancer Tor et Privoxy en même temps
-CMD ["sh", "-c", "tor & privoxy --no-daemon /etc/privoxy/config"]
+  # Assurer que la clé est sécurisée
+  chmod 600 /root/.ssh/id_rsa
+    
+  # Ajoute proxy SOCKS SSH pour Tor
+  echo "Socks5Proxy 127.0.0.1:1080" >> /etc/tor/torrc
+
+  autossh -M 0 -N \
+    -D 127.0.0.1:1080 \
+    -i /root/.ssh/id_rsa \
+    -o StrictHostKeyChecking=no \
+    -o ServerAliveInterval=60 \
+    -o ServerAliveCountMax=3 \
+    $SSH_USER@$SSH_HOST &
+
+  sleep 5
+else
+  echo "[INFO] SSH tunnel disabled — Tor direct"
+fi
+
+echo "[INFO] Starting Tor…"
+tor &
+
+echo "[INFO] Starting Privoxy…"
+exec privoxy --no-daemon /etc/privoxy/config
+EOF
+
+RUN chmod +x /entrypoint.sh
+
+# Ports exposés
+EXPOSE 9050 8118
+
+# Volumes
+VOLUME ["/etc/tor", "/var/lib/tor", "/root/.ssh"]
+
+ENTRYPOINT ["/entrypoint.sh"]
