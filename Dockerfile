@@ -34,6 +34,9 @@ echo "[INFO] SSH_TUNNEL=$SSH_TUNNEL"
 if [ "$SSH_TUNNEL" = "true" ]; then
   echo "[INFO] Starting SSH tunnel…"
 
+  # Assurer que la clé est sécurisée
+  chmod 600 /root/.ssh/id_rsa
+    
   # Ajoute proxy SOCKS SSH pour Tor
   echo "Socks5Proxy 127.0.0.1:1080" >> /etc/tor/torrc
 
