@@ -17,6 +17,9 @@ RUN apk add --no-cache \
 
 # torrc de base (proxy local)
 RUN echo "SocksPort 0.0.0.0:9050" > /etc/tor/torrc \
+ && echo "DNSPort 0.0.0.0:5353" >> /etc/tor/torrc \
+ && echo "AutomapHostsOnResolve 1" >> /etc/tor/torrc \
+ && echo "VirtualAddrNetworkIPv4 172.31.0.0/16" >> /etc/tor/torrc \
  && echo "SocksPolicy accept 0.0.0.0/0" >> /etc/tor/torrc \
  && echo "Log notice stdout" >> /etc/tor/torrc
 
