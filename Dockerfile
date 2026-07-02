@@ -69,6 +69,6 @@ RUN chmod +x /entrypoint.sh
 EXPOSE 9050 8118
 
 # Volumes
-VOLUME ["/etc/tor", "/var/lib/tor", "/root/.ssh"]
+VOLUME ["/root/.ssh"]
 
 ENTRYPOINT ["/entrypoint.sh"]
