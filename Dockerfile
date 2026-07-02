@@ -41,6 +41,7 @@ if [ "$SSH_TUNNEL" = "true" ]; then
   chmod 600 /root/.ssh/id_rsa
     
   # Ajoute proxy SOCKS SSH pour Tor
+  grep -q "Socks5Proxy" /etc/tor/torrc || \
   echo "Socks5Proxy 127.0.0.1:1080" >> /etc/tor/torrc
 
   autossh -M 0 -N \
